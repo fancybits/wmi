@@ -128,6 +128,7 @@ func (c *Client) coinitService(connectServerArgs ...interface{}) (*ole.IDispatch
 	var wmi *ole.IDispatch
 	var serviceRaw *ole.VARIANT
 
+	runtime.LockOSThread()
 	// be sure teardown happens in the reverse
 	// order from that which they were created
 	deferFn := func() {
@@ -141,6 +142,7 @@ func (c *Client) coinitService(connectServerArgs ...interface{}) (*ole.IDispatch
 			unknown.Release()
 		}
 		ole.CoUninitialize()
+		runtime.UnlockOSThread()
 	}
 
 	// if we error'ed here, clean up immediately
@@ -151,7 +153,7 @@ func (c *Client) coinitService(connectServerArgs ...interface{}) (*ole.IDispatch
 		}
 	}()
 
-	err = ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
+	err = ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED|ole.COINIT_SPEED_OVER_MEMORY)
 	if err != nil {
 		oleCode := err.(*ole.OleError).Code()
 		if oleCode != ole.S_OK && oleCode != S_FALSE {
@@ -239,8 +241,6 @@ func (c *Client) Query(query string, dst interface{}, connectServerArgs ...inter
 
 	lock.Lock()
 	defer lock.Unlock()
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 
 	service, cleanup, err := c.coinitService(connectServerArgs...)
 	if err != nil {
